@@ -1,23 +1,37 @@
-import numpy as np
+from typing import List, Tuple
 
-def generate_spike_trains(
-        inputs: int,
-        direction: str = 'left',
-        num_steps: int = 5000,
-        pulse_start: int = 500,
-        pulse_spacing: int = 400,
-        pulse_width: int = 100
-) -> np.ndarray:
-    spike_trains = np.zeros((inputs, num_steps), dtype=bool)  # shape: (5 inputs, time)
+def linear_movement(input_ids: List[int], simulation_time: float, speed: float) -> Tuple[List[float], List[int]]:
+    """
+    Generates input neuron spikes linearly distributed in time.
+    :param input_ids: Input neuron ids.
+    :param simulation_time: Total simulation time.
+    :param speed: Pulse movement speed [neurons/s].
+    :return: Lists of input neuron spikes and the corresponding timestamps.
+    """
 
-    order = list(range(inputs))
+    timestamps = []
+    spikes = []
 
-    if direction == 'left':
-        order.reverse()
+    min_id = input_ids[0]
+    max_id = input_ids[-1]
 
-    for i, neuron_idx in enumerate(order):
-        start = pulse_start + i * pulse_spacing
-        end   = start + pulse_width
-        spike_trains[neuron_idx, start:end] = True
+    current_id = min_id
+    step_dir = 1
+    time_step = 1.0 / speed
 
-    return spike_trains  # binary (T, 5)
+    t = 0.0
+
+    # Generate and plot spikes from receptor neurons
+    while t <= simulation_time:
+
+        timestamps.append(t)
+        spikes.append(current_id)
+
+        current_id += step_dir
+        t += time_step
+
+        if current_id < min_id or current_id > max_id:
+            step_dir *= -1
+            current_id += 2 * step_dir
+
+    return timestamps, spikes
