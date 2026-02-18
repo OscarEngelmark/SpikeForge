@@ -18,7 +18,7 @@ def main():
         'u_rest': -70e-3,
         'u_reset': -80e-3,
         'u_thres': -55e-3,
-        'R': 100e6,
+        'r': 100e6,
         'tau_m': 20e-3
     }
     tau_syn = 39e-3
