@@ -10,6 +10,37 @@ class Synapse:
     tau: float = 5e-3       # [s] — can be per-synapse
     i_syn: float = 0.0      # current state [A]
 
+class SpikeSource:
+    """Base for anything that can emit spikes without voltage dynamics."""
+
+    def __init__(self, name: str = "SpikeSource"):
+        self.name = name
+
+    def wants_to_spike(self, t_start: float, t_end: float) -> bool:
+        raise NotImplementedError
+
+    def consume_emitted_spike(self):
+        pass   # default: nothing (for forced/one-shot sources)
+
+class ScheduledSpikeSource(SpikeSource):
+    """
+    Spike source that emits at pre-scheduled times (sparse, per-source list).
+    Replaces ForcedSpikeSource for this example.
+    """
+    def __init__(self, spike_times: Optional[List[float]] = None, name: str = "ScheduledSource"):
+        super().__init__(name)
+        self.spike_times = sorted(spike_times or [])
+        self._idx = 0
+
+    def wants_to_spike(self, t_start: float, t_end: float) -> bool:
+        if self._idx >= len(self.spike_times):
+            return False
+        next_t = self.spike_times[self._idx]
+        return t_start <= next_t < t_end
+
+    def consume_emitted_spike(self):
+        self._idx += 1
+
 class Neuron:
     """Abstract base class"""
     def __init__(self, name: str ='Neuron', u_rest=-65e-3, u_reset=-65e-3, u_thres=-50e-3, R=95e6, tau_m=30e-3):
@@ -32,31 +63,6 @@ class Neuron:
             self.u = self.u_reset
             return True
         return False
-
-class InputNeuron(Neuron):
-    """Simple spike source neuron that can be forced to spike at specified times.
-    Does not integrate membrane potential; only exists to emit spikes on command.
-    """
-    def __init__(self, name: str = "InputNeuron", **kwargs):
-        super().__init__(name=name, **kwargs)
-        self.force_spike = False
-
-    def set_force_spike(self, force: bool):
-        self.force_spike = force
-
-    def reset_if_spiked(self) -> bool:
-        if self.force_spike:
-            self.force_spike = False
-            return True
-        return False
-
-    def integrate(self, dt: float):
-        # No voltage dynamics, this neuron does not have a membrane
-        pass
-
-    def receive_spike(self, syn_idx: int, weight: Optional[float] = None):
-        # Input neurons don't receive synapses
-        pass
 
 class CICNeuron(Neuron):
     """Constant (DC) current input"""
@@ -109,12 +115,13 @@ class Connection:
     pre_idx: int
     post_idx: int
     syn_idx: int   # which synapse on the post neuron
+    pre_is_source: bool = False
 
 class SpikingNetwork:
     def __init__(self):
         self.neurons: List[Neuron] = []
+        self.sources: List[SpikeSource] = []
         self.connections: List[Connection] = []
-        self.spikes: List[float] = []
 
     def add_neuron(self, neuron: Neuron) -> int:
         idx = len(self.neurons)
@@ -122,26 +129,30 @@ class SpikingNetwork:
         return idx
 
     def add_neurons(self, neurons: List[Neuron]) -> List[int]:
-        indices = []
-        for neuron in neurons:
-            idx = self.add_neuron(neuron)
-            indices.append(idx)
-        return indices
+        return [self.add_neuron(n) for n in neurons]
 
-    def connect(self, pre: int, post: int, syn_idx: int):
-        self.connections.append(Connection(pre, post, syn_idx))
+    def add_source(self, source: SpikeSource) -> int:
+        idx = len(self.sources)
+        self.sources.append(source)
+        return idx
+
+    def add_sources(self, sources: List[SpikeSource]) -> List[int]:
+        return [self.add_source(s) for s in sources]
+
+    def connect(self, pre: int, post: int, syn_idx: int, pre_is_source: bool = False):
+        self.connections.append(Connection(pre, post, syn_idx, pre_is_source))
 
     def step(self, dt: float) -> List[int]:
         spikes: List[int] = []
 
-        # 1. Check which neurons spikes & reset (non-linear part)
+        # 1. Check which neurons spikes & reset
         for i, n in enumerate(self.neurons):
             if n.reset_if_spiked():
                 spikes.append(i)
 
-        # 2. Propagate spikes → PSPs
+        # 2. Propagate neuron spikes to postsynaptic neurons
         for c in self.connections:
-            if c.pre_idx in spikes:
+            if not c.pre_is_source and c.pre_idx in spikes:
                 post_n = self.neurons[c.post_idx]
                 post_n.receive_spike(c.syn_idx)
 
@@ -155,31 +166,38 @@ class SpikingNetwork:
             self,
             dt: float,
             num_steps: int,
-            tracked_neurons: List[int],
-            input_spike_trains: Optional[np.ndarray] = None,
-            input_neuron_ids: Optional[List[int]] = None
-    ) -> Tuple[List[float], Dict[int, List[float]], List[int], List[int]]:
+            tracked_neurons: List[int]
+    ) -> Tuple[List[float], Dict[int, List[float]], List[float], List[int]]:
 
         t = 0.0
 
         # Store initial values
         timestamps: List[float] = [t]
         potentials: Dict[int, List[float]] = {idx: [self.neurons[idx].u] for idx in tracked_neurons}
-        t_spike = []
-        n_spike = []
+        spike_times: List[float] = []
+        spike_ids: List[int] = []
 
         for step in range(num_steps):
 
-            if input_spike_trains is not None:
-                for row_idx, neuron_id in enumerate(input_neuron_ids):
-                    if input_spike_trains[row_idx, step]:
-                        self.neurons[neuron_id].set_force_spike(True)
+            t_next = t + dt
 
-            # Update the network
-            spikes = self.step(dt)
+            # Phase 1: Handle sources
+            source_spikes = []
+            for i, s in enumerate(self.sources):
+                if s.wants_to_spike(t, t_next):
+                    source_spikes.append(i)
+                    s.consume_emitted_spike()
+
+            # Phase 2: Propagate source spikes to postsynaptic neurons
+            for c in self.connections:
+                if c.pre_is_source and c.pre_idx in source_spikes:
+                    self.neurons[c.post_idx].receive_spike(c.syn_idx)
+
+            # Phase 3: Step neurons
+            neuron_spikes = self.step(dt)
 
             # Timestep completed
-            t += dt
+            t = t_next
             timestamps.append(t)
 
             # Store membrane potentials of tracked neurons
@@ -187,11 +205,15 @@ class SpikingNetwork:
                 potentials[neuron_id].append(self.neurons[neuron_id].u)
 
             # Record spikes
-            for neuron_idx in spikes:
-                t_spike.append(t)
-                n_spike.append(neuron_idx)
+            for source_id in source_spikes:
+                spike_times.append(t)
+                spike_ids.append(-(source_id + 1)) # (sources as negative indices)
 
-        return timestamps, potentials, t_spike, n_spike
+            for neuron_id in neuron_spikes:
+                spike_times.append(t)
+                spike_ids.append(neuron_id)
+
+        return timestamps, potentials, spike_times, spike_ids
 
 
 def main():
