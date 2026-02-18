@@ -168,7 +168,7 @@ class SpikingNetwork:
         # 3. Deliver all spikes (sources + neurons)
         for c in self.connections:
             spikes = source_spikes if c.pre_is_source else neuron_spikes
-            if c.pre_idx in spikes or self._negate_index(c.pre_idx) in spikes:
+            if c.pre_idx in spikes:
                 self.neurons[c.post_idx].receive_spike(c.syn_idx)
 
         # 4. Integrate all neurons
