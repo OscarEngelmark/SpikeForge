@@ -1,13 +1,16 @@
 from matplotlib import pyplot as plt
+from matplotlib.ticker import MultipleLocator
 from SpikingNeurons import ScheduledSpikeSource, DynamicNeuron, SpikingNetwork
 from spike_generation import linear_movement
 
 def main():
-    # Implementation of the direction-selective network from Neuronify
+    """
+    This function implements the direction-selective network from Neuronify.
+    """
 
     # Simulation parameters
     dt = 0.1e-3  # 0.1 ms
-    num_steps = 15000  # total steps
+    num_steps = 20000  # total steps
     sim_time = num_steps * dt
 
     # Neuron parameters
@@ -45,7 +48,7 @@ def main():
     output_id = snn.add_neuron(output_neuron)
 
     # Define connections
-    # Connect input neurons to inhibitory neurons
+    # Connect sources to inhibitory neurons
     for idx, ID in enumerate(input_ids[:-1]):
         snn.connect(pre=ID, post=inhib_ids[idx], syn_idx=0, pre_is_source=True)
 
@@ -53,9 +56,9 @@ def main():
     for idx, ID in enumerate(inhib_ids):
         snn.connect(pre=ID, post=relay_ids[idx], syn_idx=0)
 
-    # Connect input neurons to relay neurons
+    # Connect sources to relay neurons
     for idx, ID in enumerate(input_ids[1:]):
-        snn.connect(pre=ID, post=relay_ids[idx], syn_idx=1)
+        snn.connect(pre=ID, post=relay_ids[idx], syn_idx=1, pre_is_source=True)
 
     # Connect relay neurons to output neuron
     for idx, ID in enumerate(relay_ids):
@@ -76,11 +79,12 @@ def main():
     )
 
     # Plotting
-    fig, axs = plt.subplots(2, 1, figsize=(12, 10), sharex=True, height_ratios=[2, 1])
+    fig, axs = plt.subplots(2, 1, figsize=(12, 10), sharex=True, height_ratios=[2, .8])
 
     # 1. Raster plot (all spikes)
     axs[0].scatter(spike_times, spike_ids, marker='|', s=20, c='k', lw=1.8)
-    axs[0].set_ylabel("Neuron index")
+    axs[0].set_ylabel("Neuron ID")
+    axs[0].yaxis.set_major_locator(MultipleLocator(1))
     axs[0].grid(True, alpha=0.5)
 
     # 2. Output voltage
