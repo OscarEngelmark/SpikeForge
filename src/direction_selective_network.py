@@ -50,7 +50,7 @@ def main():
     # Define connections
     # Connect sources to inhibitory neurons
     for idx, ID in enumerate(input_ids[:-1]):
-        snn.connect(pre=ID, post=inhib_ids[idx], syn_idx=0, pre_is_source=True)
+        snn.connect(pre=ID, post=inhib_ids[idx], syn_idx=0)
 
     # Connect inhibitory neurons to relay neurons
     for idx, ID in enumerate(inhib_ids):
@@ -58,7 +58,7 @@ def main():
 
     # Connect sources to relay neurons
     for idx, ID in enumerate(input_ids[1:]):
-        snn.connect(pre=ID, post=relay_ids[idx], syn_idx=1, pre_is_source=True)
+        snn.connect(pre=ID, post=relay_ids[idx], syn_idx=1)
 
     # Connect relay neurons to output neuron
     for idx, ID in enumerate(relay_ids):
