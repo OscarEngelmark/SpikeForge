@@ -124,6 +124,10 @@ class SpikingNetwork:
         self.connections: List[Connection] = []
         self.t: float = 0.0
 
+    @staticmethod
+    def _negate_index(idx: int) -> int:
+        return -(1 + idx)
+
     def add_neuron(self, neuron: Neuron) -> int:
         idx = len(self.neurons)
         self.neurons.append(neuron)
@@ -135,7 +139,7 @@ class SpikingNetwork:
     def add_source(self, source: SpikeSource) -> int:
         idx = len(self.sources)
         self.sources.append(source)
-        return idx
+        return self._negate_index(idx) # negative, descending
 
     def add_sources(self, sources: List[SpikeSource]) -> List[int]:
         return [self.add_source(s) for s in sources]
@@ -153,7 +157,7 @@ class SpikingNetwork:
         # 1. Collect source spikes in this interval
         for i, s in enumerate(self.sources):
             if s.wants_to_spike(t_start, t_end):
-                source_spikes.append(i)
+                source_spikes.append(self._negate_index(i))
                 s.consume_emitted_spike()
 
         # 2. Collect neuron spikes and reset
@@ -164,7 +168,7 @@ class SpikingNetwork:
         # 3. Deliver all spikes (sources + neurons)
         for c in self.connections:
             spikes = source_spikes if c.pre_is_source else neuron_spikes
-            if c.pre_idx in spikes:
+            if c.pre_idx in spikes or self._negate_index(c.pre_idx) in spikes:
                 self.neurons[c.post_idx].receive_spike(c.syn_idx)
 
         # 4. Integrate all neurons
@@ -188,7 +192,7 @@ class SpikingNetwork:
         spike_times: List[float] = []
         spike_ids: List[int] = []
 
-        for step in range(num_steps):
+        for _ in range(num_steps):
 
             source_spikes, neuron_spikes = self.step(dt)
 
@@ -197,10 +201,10 @@ class SpikingNetwork:
             for neuron_id in tracked_neurons:
                 potentials[neuron_id].append(self.neurons[neuron_id].u)
 
-            # Record source spikes (negative IDs)
+            # Record source spikes
             for source_id in source_spikes:
                 spike_times.append(self.t)
-                spike_ids.append(-(source_id + 1))
+                spike_ids.append(source_id) # negative
 
             # Record neuron spikes
             for neuron_id in neuron_spikes:
