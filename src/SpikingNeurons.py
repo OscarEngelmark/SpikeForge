@@ -15,7 +15,6 @@ class Connection:
     pre_id: int
     post_id: int
     syn_id: int # which synapse on the post neuron
-    pre_is_source: bool = False
 
 class SpikeSource:
     """Base for anything that can emit spikes without voltage dynamics."""
@@ -144,8 +143,8 @@ class SpikingNetwork:
     def add_sources(self, sources: List[SpikeSource]) -> List[int]:
         return [self.add_source(s) for s in sources]
 
-    def connect(self, pre: int, post: int, syn_idx: int, pre_is_source: bool = False):
-        self.connections.append(Connection(pre, post, syn_idx, pre_is_source))
+    def connect(self, pre: int, post: int, syn_idx: int):
+        self.connections.append(Connection(pre, post, syn_idx))
 
     def step(self, dt: float) -> Tuple[List[int], List[int]]:
         neuron_spikes: List[int] = []
@@ -167,7 +166,7 @@ class SpikingNetwork:
 
         # 3. Deliver all spikes (sources + neurons)
         for c in self.connections:
-            spikes = source_spikes if c.pre_is_source else neuron_spikes
+            spikes = source_spikes if c.pre_id < 0 else neuron_spikes
             if c.pre_id in spikes:
                 self.neurons[c.post_id].receive_spike(c.syn_id)
 
