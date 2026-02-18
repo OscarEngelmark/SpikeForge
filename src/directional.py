@@ -76,25 +76,18 @@ def main():
     )
 
     # Plotting
-    fig, axs = plt.subplots(3, 1, figsize=(14, 12), sharex=True,
-                            height_ratios=[2, 3, 1.5])
+    fig, axs = plt.subplots(2, 1, figsize=(12, 10), sharex=True, height_ratios=[2, 1])
 
     # 1. Raster plot (all spikes)
-    axs[0].scatter(spike_times, spike_ids, marker='|', s=20, c='k', lw=1.2)
+    axs[0].scatter(spike_times, spike_ids, marker='|', s=20, c='k', lw=1.8)
     axs[0].set_ylabel("Neuron index")
+    axs[0].grid(True, alpha=0.5)
 
     # 2. Output voltage
     axs[1].plot(timestamps, potentials[output_id], label="Output", c='darkblue')
     axs[1].axhline(y=output_neuron.u_thres, color='r', ls='--', lw=0.9, label="threshold")
     axs[1].set_ylabel("u_output [V]")
     axs[1].legend(loc='upper right')
-
-    # 3. Optional: example relay voltages (one or two)
-    for rid in relay_ids[:2]:  # show first two relays as example
-        axs[2].plot(timestamps, potentials[rid], label=f"Relay ID {rid}", lw=1.1)
-    axs[2].set_ylabel("Relay u [V]")
-    axs[2].set_xlabel("Time [s]")
-    axs[2].legend(loc='upper right')
 
     plt.tight_layout()
     plt.show()
