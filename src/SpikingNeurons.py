@@ -1,4 +1,3 @@
-import numpy as np
 from dataclasses import dataclass
 from typing import List, Optional, Tuple, Dict
 from matplotlib import pyplot as plt
@@ -49,12 +48,12 @@ class ScheduledSpikeSource(SpikeSource):
 
 class Neuron:
     """Abstract base class"""
-    def __init__(self, name: str ='Neuron', u_rest=-65e-3, u_reset=-65e-3, u_thres=-50e-3, R=95e6, tau_m=30e-3):
+    def __init__(self, name: str ='Neuron', u_rest=-65e-3, u_reset=-65e-3, u_thres=-50e-3, r=95e6, tau_m=30e-3):
         self.name    = name
         self.u_rest  = u_rest
         self.u_reset = u_reset
         self.u_thres = u_thres
-        self.R       = R
+        self.R       = r
         self.tau_m   = tau_m
         self.u       = u_reset
 
@@ -72,12 +71,12 @@ class Neuron:
 
 class CICNeuron(Neuron):
     """Constant (DC) current input"""
-    def __init__(self, I_syn: float = 0.0, **kwargs):
+    def __init__(self, i_syn: float = 0.0, **kwargs):
         super().__init__(**kwargs)
-        self.I_syn = I_syn
+        self.i_syn = i_syn
 
     def integrate(self, dt: float):
-        dudt = (self.u_rest - self.u + self.R * self.I_syn) / self.tau_m
+        dudt = (self.u_rest - self.u + self.R * self.i_syn) / self.tau_m
         self.u += dt * dudt
 
 class DynamicNeuron(Neuron):
@@ -226,8 +225,6 @@ def main():
     neurons = [n0, n1, n2]  # A population of three neurons
 
     snn.add_neurons(neurons)
-
-    t = 0  # Reset the simulation time
 
     snn.connect(pre=0, post=1, syn_idx=0) # n1 receives spikes from n0 on synapse 0
     snn.connect(pre=0, post=2, syn_idx=0) # n2 receives spikes from n0 on synapse 0
