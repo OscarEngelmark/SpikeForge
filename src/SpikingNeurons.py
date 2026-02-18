@@ -122,6 +122,7 @@ class SpikingNetwork:
         self.neurons: List[Neuron] = []
         self.sources: List[SpikeSource] = []
         self.connections: List[Connection] = []
+        self.t: float = 0.0
 
     def add_neuron(self, neuron: Neuron) -> int:
         idx = len(self.neurons)
@@ -142,25 +143,40 @@ class SpikingNetwork:
     def connect(self, pre: int, post: int, syn_idx: int, pre_is_source: bool = False):
         self.connections.append(Connection(pre, post, syn_idx, pre_is_source))
 
-    def step(self, dt: float) -> List[int]:
-        spikes: List[int] = []
+    def step(self, dt: float) -> Tuple[List[int], List[int]]:
+        neuron_spikes: List[int] = []
+        source_spikes: List[int] = []
 
-        # 1. Check which neurons spikes & reset
+        t_start = self.t
+        t_end = self.t + dt
+
+        # 1. Collect source spikes in this interval
+        for i, s in enumerate(self.sources):
+            if s.wants_to_spike(t_start, t_end):
+                source_spikes.append(i)
+                s.consume_emitted_spike()
+
+        # 2. Collect neuron spikes and reset
         for i, n in enumerate(self.neurons):
             if n.reset_if_spiked():
-                spikes.append(i)
+                neuron_spikes.append(i)
 
-        # 2. Propagate neuron spikes to postsynaptic neurons
+        # 3. Deliver all spikes (sources + neurons)
         for c in self.connections:
-            if not c.pre_is_source and c.pre_idx in spikes:
-                post_n = self.neurons[c.post_idx]
-                post_n.receive_spike(c.syn_idx)
+            if c.pre_is_source:
+                if c.pre_idx in source_spikes:
+                    self.neurons[c.post_idx].receive_spike(c.syn_idx)
+            else:
+                if c.pre_idx in neuron_spikes:
+                    self.neurons[c.post_idx].receive_spike(c.syn_idx)
 
-        # 3. Integrate all neurons
+        # 4. Integrate all neurons
         for n in self.neurons:
             n.integrate(dt)
 
-        return spikes
+        self.t = t_end
+
+        return neuron_spikes, source_spikes
 
     def simulate(
             self,
@@ -169,48 +185,31 @@ class SpikingNetwork:
             tracked_neurons: List[int]
     ) -> Tuple[List[float], Dict[int, List[float]], List[float], List[int]]:
 
-        t = 0.0
+        self.t = 0.0
 
         # Store initial values
-        timestamps: List[float] = [t]
+        timestamps: List[float] = [self.t]
         potentials: Dict[int, List[float]] = {idx: [self.neurons[idx].u] for idx in tracked_neurons}
         spike_times: List[float] = []
         spike_ids: List[int] = []
 
         for step in range(num_steps):
 
-            t_next = t + dt
+            neuron_spikes, source_spikes = self.step(dt)
 
-            # Phase 1: Handle sources
-            source_spikes = []
-            for i, s in enumerate(self.sources):
-                if s.wants_to_spike(t, t_next):
-                    source_spikes.append(i)
-                    s.consume_emitted_spike()
-
-            # Phase 2: Propagate source spikes to postsynaptic neurons
-            for c in self.connections:
-                if c.pre_is_source and c.pre_idx in source_spikes:
-                    self.neurons[c.post_idx].receive_spike(c.syn_idx)
-
-            # Phase 3: Step neurons
-            neuron_spikes = self.step(dt)
-
-            # Timestep completed
-            t = t_next
-            timestamps.append(t)
-
-            # Store membrane potentials of tracked neurons
+            # Record updated state
+            timestamps.append(self.t)
             for neuron_id in tracked_neurons:
                 potentials[neuron_id].append(self.neurons[neuron_id].u)
 
-            # Record spikes
+            # Record source spikes (negative IDs)
             for source_id in source_spikes:
-                spike_times.append(t)
-                spike_ids.append(-(source_id + 1)) # (sources as negative indices)
+                spike_times.append(self.t)
+                spike_ids.append(-(source_id + 1))
 
+            # Record neuron spikes
             for neuron_id in neuron_spikes:
-                spike_times.append(t)
+                spike_times.append(self.t)
                 spike_ids.append(neuron_id)
 
         return timestamps, potentials, spike_times, spike_ids
