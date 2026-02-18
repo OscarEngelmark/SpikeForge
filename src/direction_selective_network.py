@@ -31,7 +31,7 @@ def main():
     # Generate spike times
     input_spike_times = linear_movement(num_neurons=5, simulation_time=sim_time, speed=18)
 
-    # Define 5 input (forced spike) neurons
+    # Define 5 input sources
     input_sources = [ScheduledSpikeSource(spike_times=input_spike_times[i]) for i in range(5)]
     input_ids = snn.add_sources(input_sources)
 
