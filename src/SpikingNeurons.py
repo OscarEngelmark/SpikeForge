@@ -163,12 +163,9 @@ class SpikingNetwork:
 
         # 3. Deliver all spikes (sources + neurons)
         for c in self.connections:
-            if c.pre_is_source:
-                if c.pre_idx in source_spikes:
-                    self.neurons[c.post_idx].receive_spike(c.syn_idx)
-            else:
-                if c.pre_idx in neuron_spikes:
-                    self.neurons[c.post_idx].receive_spike(c.syn_idx)
+            spikes = source_spikes if c.pre_is_source else neuron_spikes
+            if c.pre_idx in spikes:
+                self.neurons[c.post_idx].receive_spike(c.syn_idx)
 
         # 4. Integrate all neurons
         for n in self.neurons:
@@ -176,7 +173,7 @@ class SpikingNetwork:
 
         self.t = t_end
 
-        return neuron_spikes, source_spikes
+        return source_spikes, neuron_spikes
 
     def simulate(
             self,
@@ -195,7 +192,7 @@ class SpikingNetwork:
 
         for step in range(num_steps):
 
-            neuron_spikes, source_spikes = self.step(dt)
+            source_spikes, neuron_spikes = self.step(dt)
 
             # Record updated state
             timestamps.append(self.t)
