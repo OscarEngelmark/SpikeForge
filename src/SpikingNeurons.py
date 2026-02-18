@@ -10,6 +10,13 @@ class Synapse:
     tau: float = 5e-3       # [s] — can be per-synapse
     i_syn: float = 0.0      # current state [A]
 
+@dataclass
+class Connection:
+    pre_id: int
+    post_id: int
+    syn_id: int # which synapse on the post neuron
+    pre_is_source: bool = False
+
 class SpikeSource:
     """Base for anything that can emit spikes without voltage dynamics."""
 
@@ -110,13 +117,6 @@ class DynamicNeuron(Neuron):
         dudt = (self.u_rest - self.u + self.R * I_total) / self.tau_m
         self.u += dt * dudt
 
-@dataclass
-class Connection:
-    pre_idx: int
-    post_idx: int
-    syn_idx: int   # which synapse on the post neuron
-    pre_is_source: bool = False
-
 class SpikingNetwork:
     def __init__(self):
         self.neurons: List[Neuron] = []
@@ -168,8 +168,8 @@ class SpikingNetwork:
         # 3. Deliver all spikes (sources + neurons)
         for c in self.connections:
             spikes = source_spikes if c.pre_is_source else neuron_spikes
-            if c.pre_idx in spikes:
-                self.neurons[c.post_idx].receive_spike(c.syn_idx)
+            if c.pre_id in spikes:
+                self.neurons[c.post_id].receive_spike(c.syn_id)
 
         # 4. Integrate all neurons
         for n in self.neurons:
