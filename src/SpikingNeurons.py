@@ -182,8 +182,6 @@ class SpikingNetwork:
             tracked_neurons: List[int]
     ) -> Tuple[List[float], Dict[int, List[float]], List[float], List[int]]:
 
-        self.t = 0.0
-
         # Store initial values
         timestamps: List[float] = [self.t]
         potentials: Dict[int, List[float]] = {idx: [self.neurons[idx].u] for idx in tracked_neurons}
