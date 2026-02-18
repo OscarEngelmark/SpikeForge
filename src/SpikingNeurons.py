@@ -6,9 +6,9 @@ from plotting_tools import rasterplot
 
 @dataclass
 class Synapse:
-    weight: float           # [A] or [nA], sign encodes excitation/inhibition
-    tau: float = 5e-3       # [s] — can be per-synapse
-    i_syn: float = 0.0      # current state [A]
+    weight: float           # [A] (sign encodes excitation/inhibition)
+    tau: float = 5e-3       # [s] (can be per-synapse)
+    i_syn: float = 0.0      # [A] (current state)
 
 @dataclass
 class Connection:
