@@ -1,19 +1,14 @@
 from matplotlib import pyplot as plt
-from SpikingNeurons import InputNeuron, DynamicNeuron, SpikingNetwork
-from spike_generation import generate_spike_trains
+from SpikingNeurons import ScheduledSpikeSource, DynamicNeuron, SpikingNetwork
+from spike_generation import linear_movement
 
 def main():
     # Implementation of the direction-selective network from Neuronify
 
     # Simulation parameters
-    direction = 'right'
     dt = 0.1e-3  # 0.1 ms
-    num_steps = 3000  # total steps -> 600 ms
-
-    # Spike train parameters
-    pulse_start = int(50e-3 / dt)
-    pulse_spacing = int(25e-3 / dt)
-    pulse_width = 1
+    num_steps = 15000  # total steps
+    sim_time = num_steps * dt
 
     # Neuron parameters
     kwargs = {
@@ -23,16 +18,19 @@ def main():
         'R': 100e6,
         'tau_m': 20e-3
     }
-    tau_syn = 50e-3
-    ex_weight = 300e-12
+    tau_syn = 39e-3
+    ex_weight = 350e-12
     in_weight = -250e-12
 
     # Create network instance
     snn = SpikingNetwork()
 
+    # Generate spike times
+    input_spike_times = linear_movement(num_neurons=5, simulation_time=sim_time, speed=18)
+
     # Define 5 input (forced spike) neurons
-    input_neurons = [InputNeuron(**kwargs) for _ in range(5)]
-    input_ids = snn.add_neurons(input_neurons)
+    input_sources = [ScheduledSpikeSource(spike_times=input_spike_times[i]) for i in range(5)]
+    input_ids = snn.add_sources(input_sources)
 
     # Define inhibitory neurons
     inhib_neurons = [DynamicNeuron(n_synapses=1, tau_syn=tau_syn, **kwargs) for _ in range(4)]
@@ -49,7 +47,7 @@ def main():
     # Define connections
     # Connect input neurons to inhibitory neurons
     for idx, ID in enumerate(input_ids[:-1]):
-        snn.connect(pre=ID, post=inhib_ids[idx], syn_idx=0)
+        snn.connect(pre=ID, post=inhib_ids[idx], syn_idx=0, pre_is_source=True)
 
     # Connect inhibitory neurons to relay neurons
     for idx, ID in enumerate(inhib_ids):
@@ -63,37 +61,18 @@ def main():
     for idx, ID in enumerate(relay_ids):
         snn.connect(pre=ID, post=output_id, syn_idx=idx)
 
-
+    # Set weights
     for idx in range(4):
-        # Set weights for input -> inhib connections (excitatory)
-        inhib_neurons[idx].synapses[0].weight = ex_weight  # Adjust value as needed
-
-        # Set weights for inhib -> relay connections (inhibitory)
+        inhib_neurons[idx].synapses[0].weight = ex_weight
         relay_neurons[idx].synapses[0].weight = in_weight
-
-        # Set weights for input -> relay connections (excitatory)
         relay_neurons[idx].synapses[1].weight = ex_weight
-
-        # Set weights for relay -> output connections (excitatory)
         output_neuron.synapses[idx].weight = ex_weight
 
-    # Generate input pattern matching exactly n_steps
-    spike_trains = generate_spike_trains(
-        inputs=5,
-        direction=direction,
-        num_steps=num_steps,
-        pulse_start=pulse_start,
-        pulse_spacing=pulse_spacing,
-        pulse_width=pulse_width
-    )
-
     # Run
-    timestamps, potentials, t_spike, n_spike = snn.simulate(
+    timestamps, potentials, spike_times, spike_ids = snn.simulate(
         dt=dt,
         num_steps=num_steps,
-        tracked_neurons=[output_id] + relay_ids,
-        input_spike_trains=spike_trains,
-        input_neuron_ids=input_ids
+        tracked_neurons=[output_id] + relay_ids
     )
 
     # Plotting
@@ -101,7 +80,7 @@ def main():
                             height_ratios=[2, 3, 1.5])
 
     # 1. Raster plot (all spikes)
-    axs[0].scatter(t_spike, n_spike, marker='|', s=20, c='k', lw=1.2)
+    axs[0].scatter(spike_times, spike_ids, marker='|', s=20, c='k', lw=1.2)
     axs[0].set_ylabel("Neuron index")
 
     # 2. Output voltage
@@ -112,9 +91,10 @@ def main():
 
     # 3. Optional: example relay voltages (one or two)
     for rid in relay_ids[:2]:  # show first two relays as example
-        axs[2].plot(timestamps, potentials[rid], label=f"Relay {rid}", lw=1.1)
+        axs[2].plot(timestamps, potentials[rid], label=f"Relay ID {rid}", lw=1.1)
     axs[2].set_ylabel("Relay u [V]")
     axs[2].set_xlabel("Time [s]")
+    axs[2].legend(loc='upper right')
 
     plt.tight_layout()
     plt.show()
