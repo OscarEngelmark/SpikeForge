@@ -18,8 +18,8 @@ Designed to be **easy to read, modify and extend** — ideal for teaching SNN ba
   - `CICNeuron`: LIF with constant (DC) current injection
   - `DynamicNeuron`: LIF with multiple current-based exponential synapses (PSP decay)
 - `ScheduledSpikeSource`: emits spikes at user-provided times
-- Explicit `connect(pre, post, syn_idx)` syntax — very transparent wiring
-- Time-step simulation with `step(dt)` or `simulate(dt, num_steps, tracked_neurons=…)`
+- Explicit `connect(pre, post, syn_idx)` syntax
+- Time-step simulation with `step()` or `simulate()`
 - Generates timestamps, membrane potentials, and spike times/IDs for raster plotting
 - Helper utilities for generating moving-bar-like spike patterns
 
