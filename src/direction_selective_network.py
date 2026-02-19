@@ -91,7 +91,9 @@ def main():
     axs[1].plot(timestamps, potentials[output_id], label="Output", c='darkblue')
     axs[1].axhline(y=output_neuron.u_thres, color='r', ls='--', lw=0.9, label="threshold")
     axs[1].set_ylabel("u_output [V]")
+    axs[1].set_xlabel("Time [s]")
     axs[1].legend(loc='upper right')
+
 
     plt.tight_layout()
     plt.show()
